@@ -12,13 +12,13 @@ class Solution:
             return 0
 
         # 统计每个字符的出现次数
-        freq = {}
+        freq = {} # 字符频次字典
         for c in s:
-            freq[c] = freq.get(c, 0) + 1
+            freq[c] = freq.get(c, 0) + 1 # freq.get(c, 0)：如果c不存在返回0，存在返回对应值
 
         # 找到第一个出现次数 < k 的字符，用它分割字符串
-        for c in freq:
-            if freq[c] < k:
+        for c in freq: # 遍历频次字典中的每个字符
+            if freq[c] < k: # 如果当前字符的频次小于k，说明它不满足条件，可以用它来分割字符串
                 # 对分割后的每个子串递归求解，取最大值
                 return max(self.longestSubstring_divide_conquer(part, k) for part in s.split(c))
 
@@ -37,7 +37,7 @@ class Solution:
             count_ge_k = 0   # 窗口中频次 >= k 的字符数
             unique_count = 0 # 窗口中不同字符的数量
 
-            for right in range(n):
+            for right in range(n): # 右指针遍历字符串
                 # 右指针扩展窗口
                 c = s[right]
                 if freq.get(c, 0) == 0:
@@ -47,14 +47,14 @@ class Solution:
                     count_ge_k += 1
 
                 # 窗口内不同字符数超过当前枚举值，左指针收缩
-                while unique_count > max_unique:
-                    left_c = s[left]
-                    if freq[left_c] == k:
-                        count_ge_k -= 1
-                    freq[left_c] -= 1
-                    if freq[left_c] == 0:
-                        unique_count -= 1
-                    left += 1
+                while unique_count > max_unique: # 当窗口内不同字符数超过当前枚举的最大不同字符数时，需要收缩窗口
+                    left_c = s[left] # 左指针指向的字符
+                    if freq[left_c] == k: # 如果左指针指向的字符频次正好等于k，收缩窗口后这个字符就不满足条件了，所以count_ge_k需要减1
+                        count_ge_k -= 1 # 频次 >= k 的字符数减1
+                    freq[left_c] -= 1 # 左指针指向的字符频次减1
+                    if freq[left_c] == 0: # 如果左指针指向的字符频次减到0，说明这个字符完全不在窗口内了，不满足条件的不同字符数也要减1
+                        unique_count -= 1 # 不同字符数减1
+                    left += 1 # 左指针右移，收缩窗口
 
                 # 窗口内所有字符频次都 >= k，更新最大长度
                 if count_ge_k == unique_count:
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     ]
 
     print("=== 分治递归解法测试 ===")
-    for i, (s, k, expected) in enumerate(test_cases, 1):
+    for i, (s, k, expected) in enumerate(test_cases, 1): # 枚举测试用例，i从1开始
         res = sol.longestSubstring_divide_conquer(s, k)
         print(f"测试用例{i}: s={s}, k={k}")
         print(f"  预期结果: {expected}, 实际结果: {res} {'✅' if res == expected else '❌'}")
