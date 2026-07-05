@@ -59,13 +59,12 @@ def load_wikitext() -> List[str]:
     """
     加载训练语料。
 
-    使用本地合成语料（涵盖编程、数学、AI、科学、历史等领域），
-    若安装了 datasets 并可联网，会自动尝试下载 WikiText-2。
+    使用本地合成语料（涵盖编程、数学、AI、科学、历史等多个领域），
+    便于观察不同领域的 token 被路由到不同专家。
 
-    （datasets 库的 HTTP 请求可能与 CUDA 上下文冲突导致 segfault，
-     因此在未显式 `import torch` 前不主动触发。）
+    注意：不通过 datasets 库下载 WikiText-2，因为其 HTTP 请求
+    （aiohttp）与 CUDA 上下文冲突会导致 segfault。
     """
-    # 直接使用合成语料（最稳定，足够训练 ~15M 参数模型）
     return _get_sample_texts()
 
 
@@ -82,7 +81,7 @@ def _get_sample_texts() -> List[str]:
     # 尝试通过外部语料生成器扩充
     try:
         from generate_corpus import generate_corpus
-        corpus = generate_corpus(min_tokens=80000)
+        corpus = generate_corpus(min_tokens=500000)
         texts.extend(corpus)
         total_w = sum(len(t.split()) for t in texts)
         print(f"已生成合成语料，总计 ~{total_w/1000:.0f}K tokens ({len(texts)} 段)")

@@ -120,6 +120,10 @@ class GPTMoE(nn.Module):
         self.eval()
         device = self.lm_head.weight.device
 
+        # 清理训练后残留的 GPU 内存碎片
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         tokens = tokenizer.encode(prompt) or [
             tokenizer.word2idx[tokenizer.BOS_TOKEN]
         ]
@@ -153,19 +157,48 @@ class GPTMoE(nn.Module):
             logits = self.lm_head(self.final_ln(hidden[:, -1:, :]))
             logits = logits.squeeze(0).squeeze(0) / max(temperature, 1e-10)
 
-            # Top-p (nucleus) sampling
-            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-            cum_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-            remove = cum_probs > top_p
-            remove[1:] = remove[:-1].clone()
-            remove[0] = False
-            logits[sorted_indices[remove]] = float('-inf')
-
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs.unsqueeze(0), num_samples=1)
+            # ── 安全的 top-p (nucleus) sampling ──
+            next_token = self._safe_sample(logits, top_p)
             input_ids = torch.cat([input_ids, next_token], dim=1)
 
             if next_token.item() == tokenizer.word2idx.get(tokenizer.EOS_TOKEN, -1):
                 break
 
         return tokenizer.decode(input_ids.squeeze(0).tolist()), routing_traces
+
+    def _safe_sample(self, logits: torch.Tensor, top_p: float) -> torch.Tensor:
+        """安全的 top-p 采样，防止全 -inf 导致 NaN / CUDA 崩溃。
+
+        退化策略：
+          1. 正常 top-p → multinomial 采样
+          2. 如果 top-p 把所有 token 过滤掉了 → 退化为 argmax
+          3. multinomial 万一还是失败 → 再次退化为 argmax
+        """
+        # Top-p (nucleus) filtering
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cum_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # 找到 top-p 的截断位置（至少保留 1 个 token）
+        keep_mask = cum_probs <= top_p
+        keep_mask[0] = True  # 始终保留概率最高的 token
+        # 确保第一个超过阈值的 token 也被保留
+        first_exceed = (cum_probs > top_p).nonzero(as_tuple=True)[0]
+        if len(first_exceed) > 0 and first_exceed[0].item() > 0:
+            keep_mask[first_exceed[0]] = True
+
+        # 把不在 top-p 内的 logits 置为 -inf
+        remove = ~keep_mask
+        masked_logits = logits.clone()
+        masked_logits[sorted_indices[remove]] = float('-inf')
+
+        probs = F.softmax(masked_logits, dim=-1)
+
+        # 安全检查：如果 probs 含 NaN（全 -inf 导致 0/0），退化为 argmax
+        if torch.isnan(probs).any() or probs.sum() <= 0:
+            return logits.argmax(dim=-1, keepdim=True)
+
+        try:
+            return torch.multinomial(probs.unsqueeze(0), num_samples=1)
+        except RuntimeError:
+            # CUDA 异常时的最终兜底
+            return logits.argmax(dim=-1, keepdim=True)

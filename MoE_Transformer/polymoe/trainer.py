@@ -153,7 +153,8 @@ class Trainer:
         print(
             f"  Step {self.step:5d} | LM Loss: {avg_lm:.4f} | "
             f"LB Loss: {avg_lb:.4f} | LR: {self.learning_rates[-1]:.2e} | "
-            f"GPU: {mem:.1f}GB"
+            f"GPU: {mem:.1f}GB",
+            flush=True,
         )
 
     # ── 评估 ──────────────────────────────────────────────────

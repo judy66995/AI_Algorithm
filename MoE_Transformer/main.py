@@ -37,7 +37,11 @@ import time
 
 # ── GPU 自动切换：当前环境无 CUDA 时，自动切到 conda torch_cuda 环境 ──
 def _ensure_gpu():
-    """如果当前 Python 没有 CUDA PyTorch，自动切换到 conda torch_cuda 环境"""
+    """如果当前 Python 没有 CUDA PyTorch，自动切换到 conda torch_cuda 环境
+    设置 MOE_FORCE_CPU=1 可跳过 GPU 切换，强制使用 CPU 训练
+    """
+    if os.environ.get("MOE_FORCE_CPU") == "1":
+        return  # 用户明确要求 CPU 模式
     # 先尝试 import torch，看有没有 CUDA
     import torch as _torch
     if _torch.cuda.is_available():
@@ -72,8 +76,8 @@ def _ensure_gpu():
     print(f"[auto-switch] 正在切换到 CUDA PyTorch...\n")
     sys.stdout.flush()
     subprocess.run(
-        [gpu_python] + sys.argv,
-        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        [gpu_python, "-u"] + sys.argv,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"},
         check=False,
     )
     sys.exit(0)
@@ -152,6 +156,7 @@ def parse_args() -> MoEConfig:
             d_model=128, n_heads=2, n_layers=2, d_ff=256,
             max_seq_len=64, n_experts=2, top_k=1, expert_d_ff=128,
             moe_layers=(1,), batch_size=4, seq_len=64, max_steps=200,
+            use_amp=not args.no_amp,
         )
         return config
 
@@ -189,6 +194,7 @@ def main():
 
     # ── 0. CUDA 检查 ──
     if torch.cuda.is_available():
+        torch.cuda.empty_cache()
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
         print(f"\n✓ GPU 可用: {gpu_name} ({gpu_mem:.1f} GB)")
@@ -279,6 +285,8 @@ def main():
 
     # ── 7. 生成示例 ──
     print(f"\n{'─' * 40}\n文本生成示例...")
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()  # 释放训练残留的 GPU 碎片
     for prompt in [
         "The artificial intelligence",
         "In mathematics, the",
@@ -287,8 +295,13 @@ def main():
     ]:
         print(f"\n{'·' * 40}")
         print(f"Prompt: {prompt}")
-        generated, _ = model.generate(tokenizer, prompt, max_new_tokens=30)
-        print(f"生成:   {generated}")
+        try:
+            generated, _ = model.generate(tokenizer, prompt, max_new_tokens=30)
+            print(f"生成:   {generated}")
+        except RuntimeError as e:
+            print(f"生成失败: {e}")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     # ── 8. 可视化 ──
     print(f"\n{'─' * 40}\n专家路由分析...")
@@ -298,7 +311,12 @@ def main():
         "Python code uses classes and functions to structure programs. "
         "The history of artificial intelligence began in ancient times."
     )
-    analyze_routing(model, tokenizer, test_text, config)
+    try:
+        analyze_routing(model, tokenizer, test_text, config)
+    except RuntimeError as e:
+        print(f"路由分析失败: {e}")
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     # ── 9. 总结 ──
     print(f"\n{'=' * 80}")

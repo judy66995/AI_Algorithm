@@ -43,7 +43,7 @@ def generate_corpus(min_tokens: int = 80000) -> list[str]:
         for fn in domain_fns:
             texts.extend(fn())
         iteration += 1
-        if iteration > 50:  # 安全上限
+        if iteration > 200:  # 安全上限
             break
 
     random.shuffle(texts)
@@ -89,7 +89,7 @@ def _code_domain():
         "Every programmer should understand how {noun} works in practice.",
         "The {noun} abstraction {verb} underlying complexity.",
     ]
-    return _sample(nouns, verbs, templates, 50)
+    return _sample(nouns, verbs, templates, 300)
 
 
 def _math_domain():
@@ -120,7 +120,7 @@ def _math_domain():
         "Advanced courses in mathematics cover {noun} in detail.",
         "The {noun} formula {verb} a concise representation.",
     ]
-    return _sample(nouns, verbs, templates, 50)
+    return _sample(nouns, verbs, templates, 300)
 
 
 def _ai_domain():
@@ -154,7 +154,7 @@ def _ai_domain():
         "The performance of {noun} depends on the quality of training data.",
         "New research on {noun} {verb} the boundaries of machine learning.",
     ]
-    return _sample(nouns, verbs, templates, 50)
+    return _sample(nouns, verbs, templates, 300)
 
 
 def _science_domain():
@@ -186,7 +186,7 @@ def _science_domain():
         "The theory of {noun} explains many natural phenomena.",
         "Advanced microscopy revealed the structure of {noun} in detail.",
     ]
-    return _sample(nouns, verbs, templates, 50)
+    return _sample(nouns, verbs, templates, 300)
 
 
 def _history_domain():
@@ -217,7 +217,7 @@ def _history_domain():
         "Cultural exchange through {noun} {verb} artistic expression.",
         "The history of {noun} illustrates the complexity of human progress.",
     ]
-    return _sample(nouns, verbs, templates, 50)
+    return _sample(nouns, verbs, templates, 300)
 
 
 def _narrative_domain():
