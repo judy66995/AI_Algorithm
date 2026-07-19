@@ -1,6 +1,6 @@
 # K个一组翻转链表 — 逐行代码详解
 
-> 源文件：[26_7_18/main1.py](26_7_18/main1.py)
+> 源文件：[./main1.py](./main1.py)
 >
 > 题目来源：LeetCode 25. Reverse Nodes in k-Group
 >
